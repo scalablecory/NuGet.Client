@@ -265,6 +265,7 @@ namespace NuGet.Protocol.Tests
 
                 var repo = StaticHttpHandler.CreateSource(source, Repository.Provider.GetCoreV3(), responses);
                 var resource = await repo.GetResourceAsync<PackageUpdateResource>();
+                UserAgent.SetUserAgentString(new UserAgentStringBuilder("test client"));
 
                 // Act
                 await resource.Push(
@@ -340,6 +341,7 @@ namespace NuGet.Protocol.Tests
 
                 var repo = StaticHttpHandler.CreateSource(source, Repository.Provider.GetCoreV3(), responses);
                 var resource = await repo.GetResourceAsync<PackageUpdateResource>();
+                UserAgent.SetUserAgentString(new UserAgentStringBuilder("test client"));
 
                 // Act
                 await resource.Push(
@@ -392,11 +394,11 @@ namespace NuGet.Protocol.Tests
                         }
                     },
                     {
-                        "https://other.smbsrc.net/api/v2/package/",
+                        "https://nuget.smbsrc.net/api/v2/package/",
                         request =>
                         {
                             symbolRequest = request;
-                            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
+                            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
                         }
                     },
                     {
@@ -404,7 +406,6 @@ namespace NuGet.Protocol.Tests
                         request =>
                         {
                             createKeyRequest = request;
-
                             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
                         }
                     }
@@ -413,6 +414,7 @@ namespace NuGet.Protocol.Tests
 
                 var repo = StaticHttpHandler.CreateSource(source, Repository.Provider.GetCoreV3(), responses);
                 var resource = await repo.GetResourceAsync<PackageUpdateResource>();
+                UserAgent.SetUserAgentString(new UserAgentStringBuilder("test client"));
 
                 // Act
                 await resource.Push(
@@ -457,7 +459,7 @@ namespace NuGet.Protocol.Tests
                 var responses = new Dictionary<string, Func<HttpRequestMessage, Task<HttpResponseMessage>>>
                 {
                     {
-                        "https://other.smbsrc.net/api/v2/package/",
+                        "https://nuget.smbsrc.net/api/v2/package/",
                         request =>
                         {
                             symbolRequest = request;
@@ -480,6 +482,7 @@ namespace NuGet.Protocol.Tests
 
                 var repo = StaticHttpHandler.CreateSource(source, Repository.Provider.GetCoreV3(), responses);
                 var resource = await repo.GetResourceAsync<PackageUpdateResource>();
+                UserAgent.SetUserAgentString(new UserAgentStringBuilder("test client"));
 
                 // Act
                 await resource.Push(
@@ -497,7 +500,7 @@ namespace NuGet.Protocol.Tests
                 symbolRequest.Headers.TryGetValues(ApiKeyHeader, out apiValues);
                 symbolRequest.Headers.TryGetValues(NuGetClientVersionHeader, out symbolClientVersionValues);
 
-                Assert.Equal("tempkey", apiValues.First()); // some dumb APIKEY
+                Assert.Equal("tempkey", apiValues.First());
                 Assert.NotNull(symbolClientVersionValues.First());
             }
         }

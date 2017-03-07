@@ -12,6 +12,7 @@ using NuGet.Configuration;
 using NuGet.Packaging;
 using NuGet.Packaging.Core;
 using NuGet.Versioning;
+using Newtonsoft.Json;
 
 namespace NuGet.Protocol.Core.Types
 {
@@ -22,6 +23,8 @@ namespace NuGet.Protocol.Core.Types
     {
         private const string ServiceEndpoint = "/api/v2/package";
         private const string ApiKeyHeader = "X-NuGet-ApiKey";
+        private const string TempApiKeyServiceEndpoint = "create-verification-key";
+        private const string NuGetClientVersionHeader = "X-NuGet-Client-Version";
 
         private HttpSource _httpSource;
         private string _source;
@@ -58,6 +61,12 @@ namespace NuGet.Protocol.Core.Types
 
                 var apiKey = getApiKey(_source);
 
+                // If user push to https://nuget.smbsrc.net/ directly, use temp api key.
+                if (_source.Equals(NuGetConstants.DefaultSymbolServerUrl, StringComparison.OrdinalIgnoreCase))
+                {
+                    apiKey = await GetSecureApiKey(apiKey, log, tokenSource.Token);
+                }
+
                 await PushPackage(packagePath, _source, apiKey, requestTimeout, log, tokenSource.Token);
 
                 // symbolSource is only set when:
@@ -66,6 +75,14 @@ namespace NuGet.Protocol.Core.Types
                 if (!string.IsNullOrEmpty(symbolSource))
                 {
                     string symbolApiKey = getSymbolApiKey(symbolSource);
+
+                    // if source is nuget.org or symbols source is https://nuget.smbsrc.net/, use temp api key.
+                    if (SourceUri.Host.Equals(NuGetConstants.NuGetHostName, StringComparison.OrdinalIgnoreCase) // e.g. nuget.org
+                        || SourceUri.Host.EndsWith("." + NuGetConstants.NuGetHostName, StringComparison.OrdinalIgnoreCase) // *.nuget.org, e.g. www.nuget.org
+                        || symbolSource.Equals(NuGetConstants.DefaultSymbolServerUrl, StringComparison.OrdinalIgnoreCase))
+                    {
+                        symbolApiKey = await GetSecureApiKey(symbolApiKey, log, tokenSource.Token);
+                    }
                     await PushSymbols(packagePath, symbolSource, symbolApiKey, requestTimeout, log, tokenSource.Token);
                 }
             }
@@ -310,6 +327,7 @@ namespace NuGet.Protocol.Core.Types
             // Send the data in chunks so that it can be canceled if auth fails.
             // Otherwise the whole package needs to be sent to the server before the PUT fails.
             request.Headers.TransferEncodingChunked = true;
+            request.Headers.Add(NuGetClientVersionHeader, UserAgent.UserAgentVersion);
 
             if (hasApiKey)
             {
@@ -521,6 +539,50 @@ namespace NuGet.Protocol.Core.Types
             }
 
             return true;
+        }
+
+        // Get a temp API key from nuget.org for pushing to https://nuget.smbsrc.net/
+        private async Task<string> GetSecureApiKey(string apiKey, ILogger logger, CancellationToken token)
+        {
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                return apiKey;
+            }
+            var serviceEndpointUrl = GetServiceEndpointUrl(NuGetConstants.DefaultGalleryServerUrl, TempApiKeyServiceEndpoint);
+
+            try
+            {
+                return await _httpSource.ProcessStreamAsync(
+                    new HttpSourceRequest(
+                        () =>
+                        {
+                            var request = HttpRequestMessageFactory.Create(
+                                HttpMethod.Get,
+                                serviceEndpointUrl,
+                                new HttpRequestMessageConfiguration(
+                                    logger: logger,
+                                    promptOn403: false));
+                            request.Headers.Add(ApiKeyHeader, apiKey);
+                            request.Headers.Add(NuGetClientVersionHeader, UserAgent.UserAgentVersion);
+                            return request;
+                       }),
+                    async stream =>
+                    {
+                        using (var reader = new StreamReader(await stream.AsSeekableStreamAsync()))
+                        using (var jsonReader = new JsonTextReader(reader))
+                        {
+                            var serializer = JsonSerializer.Create();
+                            var json = serializer.Deserialize<string[]>(jsonReader);
+                            return json.FirstOrDefault();
+                        }
+                    },
+                   logger,
+                   token);
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }
