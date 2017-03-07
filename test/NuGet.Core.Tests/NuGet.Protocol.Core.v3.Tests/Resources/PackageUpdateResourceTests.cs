@@ -406,7 +406,7 @@ namespace NuGet.Protocol.Tests
                         request =>
                         {
                             createKeyRequest = request;
-                            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+                            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
                         }
                     }
 
