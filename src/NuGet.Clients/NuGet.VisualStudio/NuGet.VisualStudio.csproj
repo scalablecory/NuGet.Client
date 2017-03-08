@@ -91,6 +91,10 @@
     <Compile Include="LegacyTypes\SemanticVersion.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup Condition="'$(VisualStudioVersion)' == '15.0'">
+    <Compile Include="Extensibility\IVsProjectJsonMigrateResult.cs" />
+    <Compile Include="Extensibility\IVsProjectJsonMigrator.cs" />
+  </ItemGroup>
   <ItemGroup>
     <None Include="install.ps1" />
     <None Include="NuGet.VisualStudio.nuspec" />
